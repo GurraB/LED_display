@@ -31,11 +31,13 @@
 
 #define TAG "LED_DISPLAY"
 #define OTA_TAG "OTA"
+#define MAINPROCESSOR 0
+#define ULPPROCESSOR 1
 
 //extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 //extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
-extern EventGroupHandle_t wifi_event_group;
+static EventGroupHandle_t wifi_event_group;
 
 const int CONNECTED_BIT = BIT0;
 
@@ -128,13 +130,13 @@ void init() {
     ESP_ERROR_CHECK( err );
 
     init_rgb_matrix();
-    //wifi_event_group = initialise_wifi();
+    wifi_event_group = initialise_wifi();
 }
 
 void app_main()
 {
     init();
-    //xTaskCreate(&web_server_task, "web_server_task", 16384, NULL, 1, NULL);
-    xTaskCreate(&update_display_task, "update_display_task", 16384, NULL, 1, NULL);
+    xTaskCreatePinnedToCore(&web_server_task, "web_server_task", 16384, NULL, 1, NULL, MAINPROCESSOR);
+    xTaskCreatePinnedToCore(&update_display_task, "update_display_task", 16384, NULL, 1, NULL, ULPPROCESSOR);
 }
 

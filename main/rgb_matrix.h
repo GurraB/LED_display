@@ -1,6 +1,7 @@
 #ifndef rgb_matrix_h
 #define rgb_matrix_h
 #include <inttypes.h>
+#include <stdlib.h>
 
 // Display width and height
 #define WIDTH 64
@@ -60,6 +61,10 @@ void init_rgb_matrix(void);
 void update_display(void);
 
 void set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b);
+
+void set_multiple_pixels(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b, size_t x_size, size_t y_size);
+
+void clear_display(void);
 
 void test_pins(void);
 

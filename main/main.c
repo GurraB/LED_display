@@ -93,9 +93,24 @@ void web_server_task(void* pvParameter) {
 }
 
 void update_display_task(void* pvParameter) {
+    uint16_t pos = 0;
+    uint8_t led = 0;
     while(1) {
         update_display();
-        vTaskDelay(10 / portTICK_RATE_MS);
+        if(led == 0)
+            set_pixel((pos)%64, pos/64, 1, 0, 0);
+        else if(led == 1)
+            set_pixel((pos)%64, pos/64, 0, 1, 0);
+        else
+            set_pixel((pos)%64, pos/64, 0, 0, 1);
+        pos++;
+        if(pos > 64 * 32 - 1) {
+            pos = 0;
+            led++;
+        }
+        if(led >= 3)
+            led = 0;
+        vTaskDelay(1 / portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
 }
@@ -121,23 +136,5 @@ void app_main()
     init();
     //xTaskCreate(&web_server_task, "web_server_task", 16384, NULL, 1, NULL);
     xTaskCreate(&update_display_task, "update_display_task", 16384, NULL, 1, NULL);
-    uint16_t pos = 0;
-    uint8_t led = 0;
-    while(1) {
-        if(led == 0)
-            set_pixel((pos)%64, pos/64, 1, 0, 0);
-        else if(led == 1)
-            set_pixel((pos)%64, pos/64, 0, 1, 0);
-        else
-            set_pixel((pos)%64, pos/64, 0, 0, 1);
-        pos++;
-        led++;
-        if(led >= 3)
-            led = 0;
-        if(pos >= 64*32 - 1)
-            pos = 0;
-        esp_task_wdt_reset();
-        vTaskDelay(20 / portTICK_RATE_MS);
-    }
 }
 

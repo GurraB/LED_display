@@ -24,18 +24,17 @@
 #include <sys/param.h>
 
 #include "driver/gpio.h"
+
 #include "rgb_matrix.h"
 #include "web_server.h"
 #include "wifi_connection.h"
+#include "morphing_digits.h"
 
 
 #define TAG "LED_DISPLAY"
 #define OTA_TAG "OTA"
 #define MAINPROCESSOR 0
 #define ULPPROCESSOR 1
-
-//extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-//extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
 static EventGroupHandle_t wifi_event_group;
 
@@ -94,27 +93,68 @@ void web_server_task(void* pvParameter) {
     vTaskDelete(NULL);
 }
 
-void update_display_task(void* pvParameter) {
+void clock_task(void* pvParameter) {
+    uint32_t t = 3600 * 9;
+    uint8_t s0, s1, m0, m1, h0, h1;
+    uint8_t digit_r[15] = {0};
+    uint8_t digit_g[15] = {0};
+    uint8_t digit_b[15] = {0};
+    
+    get_digit(0, digit_b);
+    while(1) {
+        s0 = (t % 60) % 10;
+        s1 = (t % 60) / 10;
+        m0 = ((t / 60) % 60) % 10;
+        m1 = ((t / 60) % 60) / 10;
+        h0 = ((t / 3600) % 3600) % 10;
+        h1 = ((t / 3600) % 3600) / 10;
+        printf("%d%d:%d%d:%d%d\n", h1, h0, m1, m0, s1, s0);
+        t++;
+        get_digit(s0, digit_b);
+        draw_digit(0, 0, digit_r, digit_g, digit_b);
+        set_pixel(2 ,17, 0, 1, 0);
+        update_display();
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
+    vTaskDelete(NULL);
+}
+
+void draw_display_task(void* pvParameter) {
+    while(1) {
+        draw_display();
+        vTaskDelay(1 / portTICK_RATE_MS);
+    }
+    vTaskDelete(NULL);
+}
+
+void test_task(void* pvParamter) {
     uint16_t pos = 0;
     uint8_t led = 0;
+    uint16_t brightness = 1000;
+    int8_t change = -1;
     while(1) {
-        update_display();
         if(led == 0)
             set_pixel((pos)%64, pos/64, 1, 0, 0);
         else if(led == 1)
             set_pixel((pos)%64, pos/64, 0, 1, 0);
         else
             set_pixel((pos)%64, pos/64, 0, 0, 1);
+        //set_brightness(brightness/10);
         pos++;
+        brightness += change;
         if(pos > 64 * 32 - 1) {
             pos = 0;
             led++;
         }
         if(led >= 3)
             led = 0;
-        vTaskDelay(1 / portTICK_RATE_MS);
+        if(brightness == 0)
+            change = 1;
+        if(brightness == 1000)
+            change = -1;
+        update_display();
+        vTaskDelay(20 / portTICK_RATE_MS);
     }
-    vTaskDelete(NULL);
 }
 
 void init() {
@@ -130,6 +170,7 @@ void init() {
     ESP_ERROR_CHECK( err );
 
     init_rgb_matrix();
+    init_morphing_digits();
     wifi_event_group = initialise_wifi();
 }
 
@@ -137,6 +178,8 @@ void app_main()
 {
     init();
     xTaskCreatePinnedToCore(&web_server_task, "web_server_task", 16384, NULL, 1, NULL, MAINPROCESSOR);
-    xTaskCreatePinnedToCore(&update_display_task, "update_display_task", 16384, NULL, 1, NULL, ULPPROCESSOR);
+    xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 1, NULL, MAINPROCESSOR);
+    //xTaskCreatePinnedToCore(&test_task, "test_task", 8192, NULL, 1, NULL, MAINPROCESSOR);
+    xTaskCreatePinnedToCore(&draw_display_task, "draw_display_task", 16384, NULL, 1, NULL, ULPPROCESSOR);
 }
 

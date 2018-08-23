@@ -93,7 +93,6 @@ esp_err_t ota_handler(httpd_req_t *req)
     }
 
     /* Send a simple response */
-    //const char resp[] = "URI POST Response";
     httpd_resp_send(req, content, recv_size);
     //set_update_url(content);
     printf("OTA_ENDPOINT, address: %s\n", content);
@@ -121,11 +120,8 @@ esp_err_t ota_renew_pem_handler(httpd_req_t *req)
          * ensure that the underlying socket is closed */
         return ESP_FAIL;
     }
-    //content[recv_size] = "\0";
     /* Send a simple response */
-    //const char resp[] = "URI POST Response";
     httpd_resp_send(req, content, recv_size);
-    //set_update_url(content);
     printf("OTA_UPDATE_PEM\n%s\n", content);
     printf("size: %d\n", recv_size);
     ota_renew_pem_cb(content);

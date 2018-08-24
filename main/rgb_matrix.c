@@ -129,26 +129,29 @@ void set_multiple_pixels(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* 
 }
 
 void draw_digit(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b) {
-    if(x%32 < 32-8) {
-        uint32_t digit_r[15];
-        uint32_t digit_g[15];
-        uint32_t digit_b[15];
-        for(uint8_t h = 0; h < 15; h++) {
-            digit_r[h] = (r[h] << ((x%32)));
-            digit_g[h] = (g[h] << ((x%32)));
-            digit_b[h] = (b[h] << ((x%32)));
-        }
-        if(buffer_semaphore != NULL) {
-            if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
-                for(uint8_t h = 0; h < 15; h++) {
-                    shared_buffer_ptr[((y + h) * 2) + (x/32) + R0_OFFSET] = digit_r[h];
-                    shared_buffer_ptr[((y + h) * 2) + (x/32) + G0_OFFSET] = digit_g[h];
-                    shared_buffer_ptr[((y + h) * 2) + (x/32) + B0_OFFSET] = digit_b[h];
-                }
-                xSemaphoreGive(buffer_semaphore);
-            }
-        }
+    uint64_t digit_r[15];
+    uint64_t digit_g[15];
+    uint64_t digit_b[15];
+    for(uint8_t h = 0; h < 15; h++) {
+        digit_r[h] = ((unsigned long long)r[h] << (x));
+        digit_g[h] = ((unsigned long long)g[h] << (x));
+        digit_b[h] = ((unsigned long long)b[h] << (x));
     }
+    if(buffer_semaphore != NULL) {
+        if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
+            for(uint8_t h = 0; h < 15; h++) {
+                shared_buffer_ptr[((y + h) * 2) + 1 + R0_OFFSET] |= (digit_r[h] >> 32);
+                shared_buffer_ptr[((y + h) * 2) + R0_OFFSET] |= (digit_r[h] & 0x00000000FFFFFFFF);
+                shared_buffer_ptr[((y + h) * 2) + 1 + G0_OFFSET] |= (digit_g[h] >> 32);
+                shared_buffer_ptr[((y + h) * 2) + G0_OFFSET] |= (digit_g[h] & 0x00000000FFFFFFFF);
+                shared_buffer_ptr[((y + h) * 2) + B0_OFFSET] |= (digit_b[h] & 0x00000000FFFFFFFF);
+                shared_buffer_ptr[((y + h) * 2) + 1 + B0_OFFSET] |= (digit_b[h] >> 32);
+                //shared_buffer_ptr[((y + h) * 2) + (x/32) + G0_OFFSET] |= digit_g[h];
+                //shared_buffer_ptr[((y + h) * 2) + (x/32) + B0_OFFSET] |= digit_b[h];
+            }
+            xSemaphoreGive(buffer_semaphore);
+        }
+    }    
 }
 
 void clear_display() {

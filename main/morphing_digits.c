@@ -42,78 +42,83 @@ uint8_t nine[] = {0b01111110, 0b10000001, 0b10000001, 0b10000001, 0b10000001,
 
 uint8_t* digits[10];
 
-void morph(uint8_t from, uint8_t to, uint8_t** animation) {
+void morph(uint8_t from, uint8_t to, uint8_t* animation_type) {
     uint8_t* arr = digits[from];
     uint8_t* target = digits[to];
 
-    //arr = zero;
-    //target = one;
-
-    uint8_t res[15];
     for(uint8_t i = 0; i < 15; i++) {
         //if the line in arr and target is the same, do nothing
         if(!(arr[i] ^ target[i]))
-            res[i] = NOTHING;
+            *animation_type++ = NOTHING;
         else if(arr[i] == 0b10000001 && target[i] == 0b00000001)
-            res[i] = REMOVE_LEFT;
+            *animation_type++ = REMOVE_LEFT;
         else if(arr[i] == 0b10000001 && target[i] == 0b10000000)
-            res[i] = REMOVE_RIGHT;
+            *animation_type++ = REMOVE_RIGHT;
         else if(arr[i] == 0b00000001 && target[i] == 0b10000000)
-            res[i] = MOVE_RIGHT_TO_LEFT;
+            *animation_type++ = MOVE_RIGHT_TO_LEFT;
         else if(arr[i] == 0b00000001 && target[i] == 0b10000001)
-            res[i] = ADD_LEFT;
+            *animation_type++ = ADD_LEFT;
         else if(arr[i] == 0b10000000 && target[i] == 0b00000001)
-            res[i] = MOVE_LEFT_TO_RIGHT;
+            *animation_type++ = MOVE_LEFT_TO_RIGHT;
         else if(arr[i] == 0b10000000 && target[i] == 0b10000001)
-            res[i] = ADD_RIGHT;
+            *animation_type++ = ADD_RIGHT;
         else if(arr[i] == 0b01111110 && target[i] == 0b00000000)
-            res[i] = REMOVE_LINE;
+            *animation_type++ = REMOVE_LINE;
         else if(arr[i] == 0b00000000 && target[i] == 0b01111110)
-            res[i] = ADD_LINE;
+            *animation_type++ = ADD_LINE;
     }
+}
 
-    for(uint8_t j = 0; j < 8; j++) {
-        uint8_t out[15];
-        for(uint8_t i = 0; i < 15; i++) {
-            uint8_t action = res[i];
-            switch(action) {
-                case NOTHING:
-                    out[i] = arr[i];
-                    break;
-                case REMOVE_RIGHT:
-                    out[i] = (arr[i] << j) | target[i];
-                    break;
-                case REMOVE_LEFT:
-                    out[i] = (arr[i] >> j) | target[i];
-                    break;
-                case REMOVE_LINE:
-                    out[i] = arr[i] >> j;
-                    break;
-                case MOVE_RIGHT_TO_LEFT:
-                    out[i] = arr[i] << j;
-                    break;
-                case MOVE_LEFT_TO_RIGHT:
-                    out[i] = arr[i] >> j;
-                    break;
-                case ADD_RIGHT:
-                    out[i] = (arr[i] >> j) | arr[i];
-                    break;
-                case ADD_LEFT:
-                    out[i] = (arr[i] << j) | arr[i];
-                    break;
-                case ADD_LINE:
-                    out[i] = 0b01111110 >> (7 - j);
-            }
+void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, uint8_t* holder) {
+    uint8_t animation_type[15];
+    uint8_t* arr = digits[from];
+    uint8_t* target = digits[to];
+    morph(from, to, animation_type);
+    for(uint8_t i = 0; i < 15; i++) {
+        switch(animation_type[i]) {
+            case NOTHING:
+                *holder = arr[i];
+                break;
+            case REMOVE_RIGHT:
+                *holder = (arr[i] << step) | target[i];
+                break;
+            case REMOVE_LEFT:
+                *holder = (arr[i] >> step) | target[i];
+                break;
+            case REMOVE_LINE:
+                *holder = arr[i] >> step;
+                break;
+            case MOVE_RIGHT_TO_LEFT:
+                *holder = arr[i] << step;
+                break;
+            case MOVE_LEFT_TO_RIGHT:
+                *holder = arr[i] >> step;
+                break;
+            case ADD_RIGHT:
+                *holder = (arr[i] >> step) | arr[i];
+                break;
+            case ADD_LEFT:
+                *holder = (arr[i] << step) | arr[i];
+                break;
+            case ADD_LINE:
+                *holder = 0b01111110 >> (7 - step);
         }
-        for(uint8_t a = 0; a < 15; a++) {
-            animation[j][a] = out[a];
-        }
+        *holder = flip_bits(*holder);
+        holder++;
     }
+}
+
+uint8_t flip_bits(uint8_t byte_to_flip) {
+    uint8_t temp = 0;
+    for(uint8_t j = 0; j < 8; j++) {
+        temp |= (((byte_to_flip & (1<<j)) >> j) & 0x01) << (7-j);
+    }
+    return temp;
 }
 
 void get_digit(uint8_t digit, uint8_t* holder) {
     for(uint8_t i = 0; i < 15; i++) {
-        *holder++ = digits[digit][i];
+        *holder++ = flip_bits(digits[digit][i]);
     }
 }
 

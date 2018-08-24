@@ -12,9 +12,11 @@
 #define ADD_LEFT 7
 #define ADD_LINE 8
 
-void morph(uint8_t from, uint8_t to, uint8_t** animation);
-
 void get_digit(uint8_t digit, uint8_t* holder);
+
+void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, uint8_t* holder);
+
+uint8_t flip_bits(uint8_t byte_to_flip);
 
 void init_morphing_digits();
 

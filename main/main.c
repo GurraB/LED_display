@@ -29,7 +29,7 @@
 #include "web_server.h"
 #include "wifi_connection.h"
 #include "morphing_digits.h"
-
+#include "clock.h"
 
 #define TAG "LED_DISPLAY"
 #define OTA_TAG "OTA"
@@ -94,76 +94,11 @@ void web_server_task(void* pvParameter) {
 }
 
 void clock_task(void* pvParameter) {
-    uint32_t t = 2500 * 9;
-    uint8_t s0, s0_old = 0, s1, s1_old = 0, m0, m0_old = 0, m1, m1_old = 0, h0, h0_old = 0, h1, h1_old = 0;
-    uint8_t digit_r[15] = {0};
-    uint8_t digit_g[15] = {0};
-    uint8_t digit_b[15] = {0};
-    
-    get_digit(0, digit_b);
+    unsigned long t;
     while(1) {
-        s0 = (t % 60) % 10;
-        s1 = (t % 60) / 10;
-        m0 = ((t / 60) % 60) % 10;
-        m1 = ((t / 60) % 60) / 10;
-        h0 = ((t / 3600) % 3600) % 10;
-        h1 = ((t / 3600) % 3600) / 10;
-        printf("%d%d:%d%d:%d%d\n", h1, h0, m1, m0, s1, s0);
-        t++;
-        for(uint8_t i = 0; i < 8; i++) {
-            if(h1 == h1_old) {
-                get_digit(h1, digit_b);
-                draw_digit(0, 0, digit_r, digit_g, digit_b);
-            } else {
-                get_single_animation_step(h1_old, h1, i, digit_b);
-                draw_digit(0, 0, digit_r, digit_g, digit_b);
-            }
-            if(h0 == h0_old) {
-                get_digit(h0, digit_b);
-                draw_digit(9, 0, digit_r, digit_g, digit_b);
-            } else {
-                get_single_animation_step(h0_old, h0, i, digit_b);
-                draw_digit(9, 0, digit_r, digit_g, digit_b);
-            }
-            set_pixel(18, 6, 0, 0, 1);
-            set_pixel(18 ,8, 0, 0, 1);
-            if(m1 == m1_old) {
-                get_digit(m1, digit_b);
-                draw_digit(20, 0, digit_r, digit_g, digit_b);
-            } else {
-                get_single_animation_step(m1_old, m1, i, digit_b);
-                draw_digit(20, 0, digit_r, digit_g, digit_b);
-            }
-            if(m0 == m0_old) {
-                get_digit(m0, digit_b);
-                draw_digit(29, 0, digit_r, digit_g, digit_b);
-            } else {
-                get_single_animation_step(m0_old, m0, i, digit_b);
-                draw_digit(29, 0, digit_r, digit_g, digit_b);
-            }
-            set_pixel(38, 6, 0, 0, 1);
-            set_pixel(38 ,8, 0, 0, 1);
-            if(s1 == s1_old) {
-                get_digit(s1, digit_b);
-                draw_digit(40, 0, digit_r, digit_g, digit_b);
-            } else {
-                get_single_animation_step(s1_old, s1, i, digit_b);
-                draw_digit(40, 0, digit_r, digit_g, digit_b);
-            }
-            get_single_animation_step(s0_old, s0, i, digit_b);
-            draw_digit(49, 0, digit_r, digit_g, digit_b);
-            
-            update_display();
-            vTaskDelay(30 / portTICK_RATE_MS);
-        }
-
-        s0_old = s0;
-        s1_old = s1;
-        m0_old = m0;
-        m1_old = m1;
-        h0_old = h0;
-        h1_old = h1;
-        vTaskDelay(760 / portTICK_RATE_MS);
+        t = esp_log_timestamp();
+        update_clock();
+        vTaskDelay((1000 - (esp_log_timestamp() - t)) / portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
 }
@@ -221,6 +156,7 @@ void init() {
     init_rgb_matrix();
     init_morphing_digits();
     wifi_event_group = initialise_wifi();
+    init_clock(wifi_event_group);
 }
 
 void app_main()

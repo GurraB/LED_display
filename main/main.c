@@ -155,6 +155,7 @@ void init() {
 
     init_rgb_matrix();
     init_morphing_digits();
+    set_brightness(100);
     wifi_event_group = initialise_wifi();
     init_clock(wifi_event_group);
 }
@@ -163,7 +164,7 @@ void app_main()
 {
     init();
     xTaskCreatePinnedToCore(&web_server_task, "web_server_task", 16384, NULL, 1, NULL, MAINPROCESSOR);
-    xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 1, NULL, MAINPROCESSOR);
+    xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 2, NULL, MAINPROCESSOR);
     //xTaskCreatePinnedToCore(&test_task, "test_task", 8192, NULL, 1, NULL, MAINPROCESSOR);
     xTaskCreatePinnedToCore(&draw_display_task, "draw_display_task", 16384, NULL, 1, NULL, ULPPROCESSOR);
 }

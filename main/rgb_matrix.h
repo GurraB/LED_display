@@ -28,7 +28,7 @@
 #define B1_OFFSET SINGLE_COLOR_BUFFER_LENGTH * 5
 
 // The time the pixels are ON in microseconds
-#define LED_ON_TIME 7
+#define LED_ON_TIME 70
 
 // The pins used to send the pixel data
 #define r0_pin 25

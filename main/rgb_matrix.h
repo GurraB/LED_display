@@ -7,28 +7,25 @@
 #define WIDTH 64
 #define HEIGHT 32
 
-//It is possible to get more than one bit color depth, however I will implement it later on
-#define COLOR_DEPTH 1
-
 /*
- * The length of the buffer, each pixel takes one bit and using uint32_t buffer
+ * The length of the buffer, each pixel takes one byte and using uint8_t buffer
  * results in a buffer size:
- * (number of pixels / pixels per element in array) * height * number of colors * color depth
- * This might not work for other displays
+ * width * height * number of colors
+ * It is not the most memory efficient, however it is simple and the ESP32 has something like 512KB of SRAM anyways.
 */
-#define BUFFER_LENGTH (WIDTH / 32) * HEIGHT * 3 * COLOR_DEPTH
+#define BUFFER_LENGTH (WIDTH * HEIGHT * 3)
 
 // Each color pin covers half the display
-#define SINGLE_COLOR_BUFFER_LENGTH ((WIDTH / 32) * (HEIGHT / 2))
+#define SINGLE_COLOR_BUFFER_LENGTH ((WIDTH * HEIGHT) / 2)
 #define R0_OFFSET 0
-#define R1_OFFSET SINGLE_COLOR_BUFFER_LENGTH
-#define G0_OFFSET SINGLE_COLOR_BUFFER_LENGTH * 2
-#define G1_OFFSET SINGLE_COLOR_BUFFER_LENGTH * 3
-#define B0_OFFSET SINGLE_COLOR_BUFFER_LENGTH * 4
-#define B1_OFFSET SINGLE_COLOR_BUFFER_LENGTH * 5
+#define G0_OFFSET 1
+#define B0_OFFSET 2
+#define R1_OFFSET 3
+#define G1_OFFSET 4
+#define B1_OFFSET 5
 
-// The time the pixels are ON in microseconds
-#define LED_ON_TIME 70
+// The time the pixels are ON in microseconds at 1% brightness
+#define LED_ON_TIME 1
 
 // The pins used to send the pixel data
 #define r0_pin 25
@@ -64,7 +61,11 @@ void draw_display(void);
 
 void set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b);
 
+void set_pixel_in_buffer(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b, uint8_t* buff);
+
 void set_multiple_pixels(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b, size_t x_size, size_t y_size);
+
+void set_display(uint8_t* buff);
 
 void clear_display(void);
 

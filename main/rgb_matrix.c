@@ -15,17 +15,27 @@
 
 #define UPDATED_BIT BIT0
 
-static uint32_t buffer[BUFFER_LENGTH * 2];
-uint32_t* buffer_ptr = buffer + BUFFER_LENGTH;
-uint32_t* shared_buffer_ptr = buffer;
+//static uint32_t buffer[BUFFER_LENGTH * 2];
+//uint32_t* buffer_ptr = buffer + BUFFER_LENGTH;
+//uint32_t* shared_buffer_ptr = buffer;
 SemaphoreHandle_t buffer_semaphore;
 SemaphoreHandle_t buffer_swap_semaphore;
 uint8_t state = 0;
 uint8_t brightness = 100;
 uint8_t shared_brightness = 100;
-uint8_t pos, shift, r0_val, b0_val, g0_val, r1_val, g1_val, b1_val;
+uint8_t r0_val, b0_val, g0_val, r1_val, g1_val, b1_val;
+uint16_t pos = 0, offset = 0;
 uint64_t t0 = 0;
+uint64_t t1, t2, t3;
 uint32_t timer_ticks_per_us;
+//uint8_t color_intensity_counter = 0;
+//------------------------------------------------------------
+static uint8_t buffer[BUFFER_LENGTH * 2];
+uint8_t* buffer_ptr = buffer;
+uint8_t* shared_buffer_ptr = buffer + BUFFER_LENGTH;
+EventGroupHandle_t update_display_handle;
+#define NEW_DATA_BIT BIT0
+uint64_t test = 0;
 
 void init_pins() {
     gpio_config_t io_conf;
@@ -52,14 +62,18 @@ void init_rgb_matrix() {
     buffer_swap_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(buffer_semaphore);
     xSemaphoreGive(buffer_swap_semaphore);
+    update_display_handle = xEventGroupCreate();
+    xEventGroupClearBits(update_display_handle, NEW_DATA_BIT);
     uint32_t apb_freq = rtc_clk_apb_freq_get();
     timer_ticks_per_us = apb_freq / 1000000;
 }
 
 void update_display() {
-    if(xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE) {
-        if(xSemaphoreTake(buffer_swap_semaphore, (TickType_t) 10) == pdTRUE) {
-            uint32_t* temp = buffer_ptr;
+    xEventGroupSetBits(update_display_handle, NEW_DATA_BIT);
+    /*
+    if(xSemaphoreTake(buffer_semaphore, (TickType_t) 20) == pdTRUE) {
+        if(xSemaphoreTake(buffer_swap_semaphore, (TickType_t) 20) == pdTRUE) {
+            uint8_t* temp = buffer_ptr;
             buffer_ptr = shared_buffer_ptr;
             shared_buffer_ptr = temp;
             brightness = shared_brightness;
@@ -69,12 +83,19 @@ void update_display() {
         }
         xSemaphoreGive(buffer_semaphore);
         clear_display();
-    }
+    }*/
 }
 
 void draw_display() {
-    if(xSemaphoreTake(buffer_swap_semaphore, (TickType_t) 5) == pdTRUE) {
+    test = 0;
+    t1 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
+    // wait till it's time to turn off leds again
+    //if(xSemaphoreTake(buffer_swap_semaphore, (TickType_t) 5) == pdTRUE) {  
+    for(uint8_t color_intensity_counter = 1; color_intensity_counter < 9; color_intensity_counter++) {
+        volatile uint8_t* temp_ptr = buffer;
+        t2 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
         for(uint8_t i = 0; i < 16; i++) {
+            t3 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
             if(i & 0x01) {
                 GPIO.out_w1ts = (1 << A_pin);
             } else {
@@ -95,74 +116,122 @@ void draw_display() {
             } else {
                 GPIO.out_w1tc = (1 << D_pin);
             }
-            t0 = (uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)); // get time when turning on leds
             
-            GPIO.out_w1tc = (1 << OE);
-            
+            pos = i * 64 * 6;
             for(uint8_t k = 0; k < 64; k++) {
-                    pos = i*2 + (k >> 5);
-                    shift = k & 0b11111;
-                    
-                    if((buffer_ptr[pos + R0_OFFSET] >> shift) & 0x01) {
-                        GPIO.out_w1ts = (1 << r0_pin);
-                    } else {
-                        GPIO.out_w1tc = (1 << r0_pin);
-                    }
-                    if((buffer_ptr[pos + G0_OFFSET] >> shift) & 0x01) {
-                        GPIO.out_w1ts = (1 << g0_pin);
-                    } else {
-                        GPIO.out_w1tc = (1 << g0_pin);
-                    }
-                    if((buffer_ptr[pos + B0_OFFSET] >> shift) & 0x01) {
-                        GPIO.out_w1ts = (1 << b0_pin);
-                    } else {
-                        GPIO.out_w1tc = (1 << b0_pin);
-                    }
-                    if((buffer_ptr[pos + R1_OFFSET] >> shift) & 0x01) {
-                        GPIO.out_w1ts = (1 << r1_pin);
-                    } else {
-                        GPIO.out_w1tc = (1 << r1_pin);
-                    }
-                    if((buffer_ptr[pos + G1_OFFSET] >> shift) & 0x01) {
-                        GPIO.out_w1ts = (1 << g1_pin);
-                    } else {
-                        GPIO.out_w1tc = (1 << g1_pin);
-                    }
-                    if((buffer_ptr[pos + B1_OFFSET] >> shift) & 0x01) {
-                        GPIO.out_w1ts = (1 << b1_pin);
-                    } else {
-                        GPIO.out_w1tc = (1 << b1_pin);
-                    }
-                    
-                    GPIO.out_w1ts = (1 << CLK);
-                    GPIO.out_w1tc = (1 << CLK);
+                offset = k*6;
+                if((*temp_ptr++) >= color_intensity_counter) {
+                    GPIO.out_w1ts = (1 << r0_pin);
+                } else {
+                    GPIO.out_w1tc = (1 << r0_pin);
+                }
+                if((*temp_ptr++) >= color_intensity_counter) {
+                    GPIO.out_w1ts = (1 << g0_pin);
+                } else {
+                    GPIO.out_w1tc = (1 << g0_pin);
+                }
+                if((*temp_ptr++) >= color_intensity_counter) {
+                    GPIO.out_w1ts = (1 << b0_pin);
+                } else {
+                    GPIO.out_w1tc = (1 << b0_pin);
+                }
+                if((*temp_ptr++) >= color_intensity_counter) {
+                    GPIO.out_w1ts = (1 << r1_pin);
+                } else {
+                    GPIO.out_w1tc = (1 << r1_pin);
+                }
+                if((*temp_ptr++) >= color_intensity_counter) {
+                    GPIO.out_w1ts = (1 << g1_pin);
+                } else {
+                    GPIO.out_w1tc = (1 << g1_pin);
+                }
+                if((*temp_ptr++) >= color_intensity_counter) {
+                    GPIO.out_w1ts = (1 << b1_pin);
+                } else {
+                    GPIO.out_w1tc = (1 << b1_pin);
+                }
+                
+                GPIO.out_w1ts = (1 << CLK);
+                GPIO.out_w1tc = (1 << CLK);
             }
-            // wait till it's time to turn off leds again
-            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t0) / timer_ticks_per_us) < LED_ON_TIME);
-            GPIO.out_w1ts = (1 << OE);
-
+            //printf("%llu\n", ((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us));
             GPIO.out_w1ts = (1 << LAT);
+            t0 = REG_READ(FRC_TIMER_COUNT_REG(1));
+            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t0) / timer_ticks_per_us) < (1));
             GPIO.out_w1tc = (1 << LAT);
+            t0 = REG_READ(FRC_TIMER_COUNT_REG(1));
+            GPIO.out_w1tc = (1 << OE);
+            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t0) / timer_ticks_per_us) < ((LED_ON_TIME * brightness * 2)));
+            GPIO.out_w1ts = (1 << OE);
+            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t3) / timer_ticks_per_us) < (90));
         }
-        xSemaphoreGive(buffer_swap_semaphore);
+        
     }
+    if(xEventGroupGetBits(update_display_handle) & NEW_DATA_BIT) {
+        if(xSemaphoreTake(buffer_semaphore, (TickType_t) 20) == pdTRUE) {
+            uint8_t* temp = buffer_ptr;
+            buffer_ptr = shared_buffer_ptr;
+            shared_buffer_ptr = temp;
+            brightness = shared_brightness;
+            xSemaphoreGive(buffer_semaphore);
+            //clear_display();
+            xEventGroupClearBits(update_display_handle, NEW_DATA_BIT);
+        } else {
+            ESP_LOGE(LED_TAG, "Failed to swap the buffers");
+        }
+    }
+    while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us) < (10000));
+    //printf("%llu\n", ((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us));
 }
 
 void set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
     // error check if the pixel is outside of panel, since it's unsigned integer, most unsigned values will be outside (iffy)
     if(x >= WIDTH || y >= HEIGHT)
         return;
-    //ESP_LOGI(LED_TAG, "setting x:%d, y:%d\t%d %d %d", x, y, r, g, b);
-
-    uint8_t pos = (y * 2) + (x / 32);
+    printf("setting x:%d, y:%d\t%d %d %d\n", x, y, r, g, b);
+    uint32_t row_offset;
     if(buffer_semaphore != NULL) {
         if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
-            shared_buffer_ptr[pos + R0_OFFSET] |= (r << (x%32));
-            shared_buffer_ptr[pos + R0_OFFSET] &= ~((1-r) << (x%32));
-            shared_buffer_ptr[pos + G0_OFFSET] |= (g << (x%32));
-            shared_buffer_ptr[pos + G0_OFFSET] &= ~((1-g) << (x%32));
-            shared_buffer_ptr[pos + B0_OFFSET] |= (b << (x%32));
-            shared_buffer_ptr[pos + B0_OFFSET] &= ~((1-b) << (x%32));
+            if(y < 16) {
+                row_offset = y * 64 * 6;
+                shared_buffer_ptr[row_offset + R0_OFFSET + x*6] = r;
+                shared_buffer_ptr[row_offset + G0_OFFSET + x*6] = g;
+                shared_buffer_ptr[row_offset + B0_OFFSET + x*6] = b;
+            } else {
+                row_offset = (y-16) * 64 * 6;
+                shared_buffer_ptr[row_offset + R1_OFFSET + x*6] = r;
+                shared_buffer_ptr[row_offset + G1_OFFSET + x*6] = g;
+                shared_buffer_ptr[row_offset + B1_OFFSET + x*6] = b;
+            }
+            
+            xSemaphoreGive(buffer_semaphore);
+        }
+    }
+}
+
+void set_pixel_in_buffer(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b, uint8_t* buff) {
+    // error check if the pixel is outside of panel, since it's unsigned integer, most unsigned values will be outside (iffy)
+    if(x >= WIDTH || y >= HEIGHT)
+        return;
+    uint16_t row_offset;
+            
+    if(y < 16) {
+        row_offset = y * 64 * 6;
+        buff[row_offset + R0_OFFSET + x*6] = r;
+        buff[row_offset + G0_OFFSET + x*6] = g;
+        buff[row_offset + B0_OFFSET + x*6] = b;
+    } else {
+        row_offset = (y-16) * 64 * 6;
+        buff[row_offset + R1_OFFSET + x*6] = r;
+        buff[row_offset + G1_OFFSET + x*6] = g;
+        buff[row_offset + B1_OFFSET + x*6] = b;
+    }
+}
+
+void set_display(uint8_t* buff) {
+    if(buffer_semaphore != NULL) {
+        if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
+            memcpy(shared_buffer_ptr, buff, BUFFER_LENGTH * sizeof(uint8_t));
             xSemaphoreGive(buffer_semaphore);
         }
     }
@@ -203,7 +272,7 @@ void draw_digit(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b) {
 void clear_display() {
     if(buffer_semaphore != NULL) {
         if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
-            memset(shared_buffer_ptr, 0, BUFFER_LENGTH * sizeof(uint32_t));
+            memset(shared_buffer_ptr, 0, BUFFER_LENGTH * sizeof(uint8_t));
             xSemaphoreGive(buffer_semaphore);
         }
     }

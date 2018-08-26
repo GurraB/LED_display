@@ -36,7 +36,11 @@
 #define MAINPROCESSOR 0
 #define ULPPROCESSOR 1
 
+#define MAX_DISPLAY_UPDATE_FREQ (10 / portTICK_RATE_MS)
+
 static EventGroupHandle_t wifi_event_group;
+
+static uint8_t local_buffer[BUFFER_LENGTH]; 
 
 const int CONNECTED_BIT = BIT0;
 
@@ -80,6 +84,7 @@ void ota_renew_pem_callback(char* pem) {
     
 
 void web_server_task(void* pvParameter) {
+    printf("Web server task started\n");
     // wait till the CONNECTED_BIT is set to 1
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     
@@ -104,40 +109,31 @@ void clock_task(void* pvParameter) {
 }
 
 void draw_display_task(void* pvParameter) {
+    printf("Draw display task started\n");
+    esp_task_wdt_delete(NULL);
     while(1) {
         draw_display();
-        vTaskDelay(1 / portTICK_RATE_MS);
+        //esp_task_wdt_reset();
+        //vTaskDelay(1);
     }
     vTaskDelete(NULL);
 }
 
 void test_task(void* pvParamter) {
+    printf("Test task started\n");
     uint16_t pos = 0;
     uint8_t led = 0;
-    uint16_t brightness = 1000;
-    int8_t change = -1;
     while(1) {
-        if(led == 0)
-            set_pixel((pos)%64, pos/64, 1, 0, 0);
-        else if(led == 1)
-            set_pixel((pos)%64, pos/64, 0, 1, 0);
-        else
-            set_pixel((pos)%64, pos/64, 0, 0, 1);
-        //set_brightness(brightness/10);
-        pos++;
-        brightness += change;
-        if(pos > 64 * 32 - 1) {
-            pos = 0;
-            led++;
+        for(uint8_t i = 0; i < 64; i++) {
+            set_pixel_in_buffer(i, pos, 7, 1, 8, local_buffer);
         }
-        if(led >= 3)
-            led = 0;
-        if(brightness == 0)
-            change = 1;
-        if(brightness == 1000)
-            change = -1;
+        //memset(local_buffer, 0x01, BUFFER_LENGTH * sizeof(uint8_t));
+        pos++;
+        if(pos > 31)
+            pos = 0;
+        set_display(local_buffer);
         update_display();
-        vTaskDelay(20 / portTICK_RATE_MS);
+        vTaskDelay(MAX_DISPLAY_UPDATE_FREQ);
     }
 }
 
@@ -155,17 +151,19 @@ void init() {
 
     init_rgb_matrix();
     init_morphing_digits();
-    set_brightness(100);
+    set_brightness(5);
     wifi_event_group = initialise_wifi();
     init_clock(wifi_event_group);
+    xTaskHandle idle_handle = xTaskGetIdleTaskHandleForCPU(1);
+    esp_task_wdt_delete(idle_handle);
 }
 
 void app_main()
 {
     init();
     xTaskCreatePinnedToCore(&web_server_task, "web_server_task", 16384, NULL, 1, NULL, MAINPROCESSOR);
-    xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 2, NULL, MAINPROCESSOR);
-    //xTaskCreatePinnedToCore(&test_task, "test_task", 8192, NULL, 1, NULL, MAINPROCESSOR);
+    //xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 2, NULL, MAINPROCESSOR);
+    xTaskCreatePinnedToCore(&test_task, "test_task", 16384, NULL, 2, NULL, MAINPROCESSOR);
     xTaskCreatePinnedToCore(&draw_display_task, "draw_display_task", 16384, NULL, 1, NULL, ULPPROCESSOR);
 }
 

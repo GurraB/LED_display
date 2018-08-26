@@ -81,8 +81,6 @@ void ota_renew_pem_callback(char* pem) {
     strcpy(ota_ca_cert, pem);
 }
 
-    
-
 void web_server_task(void* pvParameter) {
     printf("Web server task started\n");
     // wait till the CONNECTED_BIT is set to 1
@@ -113,8 +111,6 @@ void draw_display_task(void* pvParameter) {
     esp_task_wdt_delete(NULL);
     while(1) {
         draw_display();
-        //esp_task_wdt_reset();
-        //vTaskDelay(1);
     }
     vTaskDelete(NULL);
 }
@@ -127,7 +123,6 @@ void test_task(void* pvParamter) {
         for(uint8_t i = 0; i < 64; i++) {
             set_pixel_in_buffer(i, pos, 7, 1, 8, local_buffer);
         }
-        //memset(local_buffer, 0x01, BUFFER_LENGTH * sizeof(uint8_t));
         pos++;
         if(pos > 31)
             pos = 0;
@@ -155,7 +150,7 @@ void init() {
     wifi_event_group = initialise_wifi();
     init_clock(wifi_event_group);
     xTaskHandle idle_handle = xTaskGetIdleTaskHandleForCPU(1);
-    esp_task_wdt_delete(idle_handle);
+    esp_task_wdt_delete(idle_handle); // the second CPU is dedicated to draw the display, therefore we don't want wdt on IDLE task
 }
 
 void app_main()

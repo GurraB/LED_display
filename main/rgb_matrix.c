@@ -15,27 +15,19 @@
 
 #define UPDATED_BIT BIT0
 
-//static uint32_t buffer[BUFFER_LENGTH * 2];
-//uint32_t* buffer_ptr = buffer + BUFFER_LENGTH;
-//uint32_t* shared_buffer_ptr = buffer;
 SemaphoreHandle_t buffer_semaphore;
-SemaphoreHandle_t buffer_swap_semaphore;
-uint8_t state = 0;
-uint8_t brightness = 100;
-uint8_t shared_brightness = 100;
-uint8_t r0_val, b0_val, g0_val, r1_val, g1_val, b1_val;
-uint16_t pos = 0, offset = 0;
-uint64_t t0 = 0;
-uint64_t t1, t2, t3;
-uint32_t timer_ticks_per_us;
-//uint8_t color_intensity_counter = 0;
-//------------------------------------------------------------
+EventGroupHandle_t update_display_handle;
+#define NEW_DATA_BIT BIT0
+
 static uint8_t buffer[BUFFER_LENGTH * 2];
 uint8_t* buffer_ptr = buffer;
 uint8_t* shared_buffer_ptr = buffer + BUFFER_LENGTH;
-EventGroupHandle_t update_display_handle;
-#define NEW_DATA_BIT BIT0
-uint64_t test = 0;
+
+uint8_t brightness = 100;
+uint8_t shared_brightness = 100;
+uint8_t r0_val, b0_val, g0_val, r1_val, g1_val, b1_val;
+uint64_t t0 = 0, t1, t2, t3;
+uint32_t timer_ticks_per_us;
 
 void init_pins() {
     gpio_config_t io_conf;
@@ -59,9 +51,7 @@ void init_pins() {
 void init_rgb_matrix() {
     init_pins();
     buffer_semaphore = xSemaphoreCreateBinary();
-    buffer_swap_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(buffer_semaphore);
-    xSemaphoreGive(buffer_swap_semaphore);
     update_display_handle = xEventGroupCreate();
     xEventGroupClearBits(update_display_handle, NEW_DATA_BIT);
     uint32_t apb_freq = rtc_clk_apb_freq_get();
@@ -70,27 +60,10 @@ void init_rgb_matrix() {
 
 void update_display() {
     xEventGroupSetBits(update_display_handle, NEW_DATA_BIT);
-    /*
-    if(xSemaphoreTake(buffer_semaphore, (TickType_t) 20) == pdTRUE) {
-        if(xSemaphoreTake(buffer_swap_semaphore, (TickType_t) 20) == pdTRUE) {
-            uint8_t* temp = buffer_ptr;
-            buffer_ptr = shared_buffer_ptr;
-            shared_buffer_ptr = temp;
-            brightness = shared_brightness;
-            xSemaphoreGive(buffer_swap_semaphore);
-        } else {
-            ESP_LOGE(LED_TAG, "Failed to swap the buffers");
-        }
-        xSemaphoreGive(buffer_semaphore);
-        clear_display();
-    }*/
 }
 
 void draw_display() {
-    test = 0;
     t1 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
-    // wait till it's time to turn off leds again
-    //if(xSemaphoreTake(buffer_swap_semaphore, (TickType_t) 5) == pdTRUE) {  
     for(uint8_t color_intensity_counter = 1; color_intensity_counter < 9; color_intensity_counter++) {
         volatile uint8_t* temp_ptr = buffer;
         t2 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
@@ -117,9 +90,7 @@ void draw_display() {
                 GPIO.out_w1tc = (1 << D_pin);
             }
             
-            pos = i * 64 * 6;
             for(uint8_t k = 0; k < 64; k++) {
-                offset = k*6;
                 if((*temp_ptr++) >= color_intensity_counter) {
                     GPIO.out_w1ts = (1 << r0_pin);
                 } else {
@@ -154,16 +125,13 @@ void draw_display() {
                 GPIO.out_w1ts = (1 << CLK);
                 GPIO.out_w1tc = (1 << CLK);
             }
-            //printf("%llu\n", ((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us));
             GPIO.out_w1ts = (1 << LAT);
-            t0 = REG_READ(FRC_TIMER_COUNT_REG(1));
-            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t0) / timer_ticks_per_us) < (1));
             GPIO.out_w1tc = (1 << LAT);
             t0 = REG_READ(FRC_TIMER_COUNT_REG(1));
             GPIO.out_w1tc = (1 << OE);
             while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t0) / timer_ticks_per_us) < ((LED_ON_TIME * brightness * 2)));
             GPIO.out_w1ts = (1 << OE);
-            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t3) / timer_ticks_per_us) < (90));
+            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t3) / timer_ticks_per_us) < (90)); // making sure every line taskes the same amount of time to draw reduces flickering
         }
         
     }
@@ -180,7 +148,7 @@ void draw_display() {
             ESP_LOGE(LED_TAG, "Failed to swap the buffers");
         }
     }
-    while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us) < (10000));
+    while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us) < (10000)); // update the display every 1 ms
     //printf("%llu\n", ((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us));
 }
 
@@ -287,12 +255,4 @@ void set_brightness(uint8_t brightness_val) {
             xSemaphoreGive(buffer_semaphore);
         }
     }
-}
-
-void test_pins() {
-    if(state & 0x01)
-        gpio_output_set(GPIO_OUTPUT_PIN_SEL, 0x00, GPIO_OUTPUT_PIN_SEL, 0x00);
-    else
-        gpio_output_set(0x00, GPIO_OUTPUT_PIN_SEL, GPIO_OUTPUT_PIN_SEL, 0x00);
-    state++;
 }

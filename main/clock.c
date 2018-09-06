@@ -2,6 +2,7 @@
 #include <inttypes.h>
 #include <time.h>
 #include "esp_log.h"
+#include <string.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -13,21 +14,24 @@
 #include "morphing_digits.h"
 
 #define CLOCK_TAG "CLOCK_TAG"
-#ifndef CONNECTED_BIT
-#define CONNECTED_BIT BIT0
-#endif
+//#ifndef CONNECTED_BIT
+//#define CONNECTED_BIT BIT0
+//#endif
 
 #define TIME_SET_BIT BIT0
 static EventGroupHandle_t time_event_group;
 
 uint8_t s0, s0_old = 0, s1, s1_old = 0, m0, m0_old = 0, m1, m1_old = 0, h0, h0_old = 0, h1, h1_old = 0, day0, day1, month0, month1;
 uint8_t digit[15] = {0};
+struct rgb_color color_digit[15 * 8];
+struct rgb_color color_digit_empty[15];
 uint8_t digit_empty[15] = {0};
 
 time_t now;
 struct tm timeinfo;
 
 uint8_t update_clock() {
+    struct rgb_color color = get_color(0, 0, 255);
     get_time();
     
     if(!(xEventGroupGetBits(time_event_group) & TIME_SET_BIT)) {
@@ -48,48 +52,48 @@ uint8_t update_clock() {
 
     for(uint8_t i = 0; i < 8; i++) {
         if(h1 == h1_old) {
-            get_digit(h1, digit);
-            draw_digit(0, 0, digit_empty, digit_empty, digit);
+            get_digit(h1, color_digit, color);
+            draw_digit(0, 0, color_digit);
         } else {
-            get_single_animation_step(h1_old, h1, i, digit);
-            draw_digit(0, 0, digit_empty, digit_empty, digit);
+            get_single_animation_step(h1_old, h1, i, color_digit, color);
+            draw_digit(0, 0, color_digit);
         }
         if(h0 == h0_old) {
-            get_digit(h0, digit);
-            draw_digit(9, 0, digit_empty, digit_empty, digit);
+            get_digit(h0, color_digit, color);
+            draw_digit(9, 0, color_digit);
         } else {
-            get_single_animation_step(h0_old, h0, i, digit);
-            draw_digit(9, 0, digit_empty, digit_empty, digit);
+            get_single_animation_step(h0_old, h0, i, color_digit, color);
+            draw_digit(9, 0, color_digit);
         }
-        set_pixel(18, 6, 0, 0, 1);
-        set_pixel(18 ,8, 0, 0, 1);
+        set_pixel(18, 6, color);
+        set_pixel(18 ,8, color);
         if(m1 == m1_old) {
-            get_digit(m1, digit);
-            draw_digit(20, 0, digit_empty, digit_empty, digit);
+            get_digit(m1, color_digit, color);
+            draw_digit(20, 0, color_digit);
         } else {
-            get_single_animation_step(m1_old, m1, i, digit);
-            draw_digit(20, 0, digit_empty, digit_empty, digit);
+            get_single_animation_step(m1_old, m1, i, color_digit, color);
+            draw_digit(20, 0, color_digit);
         }
         if(m0 == m0_old) {
-            get_digit(m0, digit);
-            draw_digit(29, 0, digit_empty, digit_empty, digit);
+            get_digit(m0, color_digit, color);
+            draw_digit(29, 0, color_digit);
         } else {
-            get_single_animation_step(m0_old, m0, i, digit);
-            draw_digit(29, 0, digit_empty, digit_empty, digit);
+            get_single_animation_step(m0_old, m0, i, color_digit, color);
+            draw_digit(29, 0, color_digit);
         }
-        set_pixel(38, 6, 0, 0, 1);
-        set_pixel(38 ,8, 0, 0, 1);
+        set_pixel(38, 6, color);
+        set_pixel(38 ,8, color);
         if(s1 == s1_old) {
-            get_digit(s1, digit);
-            draw_digit(40, 0, digit_empty, digit_empty, digit);
+            get_digit(s1, color_digit, color);
+            draw_digit(40, 0, color_digit);
         } else {
-            get_single_animation_step(s1_old, s1, i, digit);
-            draw_digit(40, 0, digit_empty, digit_empty, digit);
+            get_single_animation_step(s1_old, s1, i, color_digit, color);
+            draw_digit(40, 0, color_digit);
         }
-        get_single_animation_step(s0_old, s0, i, digit);
-        draw_digit(49, 0, digit_empty, digit_empty, digit);
+        get_single_animation_step(s0_old, s0, i, color_digit, color);
+        draw_digit(49, 0, color_digit);
         
-        get_digit(day1, digit);
+        /*get_digit(day1, digit);
         draw_digit(0, 16, digit_empty, digit, digit_empty);
         get_digit(day0, digit);
         draw_digit(9, 16, digit_empty, digit, digit_empty);
@@ -113,11 +117,12 @@ uint8_t update_clock() {
         get_digit(month1, digit);
         draw_digit(24, 16, digit_empty, digit, digit_empty);
         get_digit(month0, digit);
-        draw_digit(33, 16, digit_empty, digit, digit_empty);
+        draw_digit(33, 16, digit_empty, digit, digit_empty);*/
 
         update_display();
-        vTaskDelay(30 / portTICK_RATE_MS);
+        vTaskDelay(20 / portTICK_RATE_MS);
     }
+    
     s0_old = s0;
     s1_old = s1;
     m0_old = m0;
@@ -149,12 +154,13 @@ void init_clock(EventGroupHandle_t wifi_event_group) {
     if(retry < retry_count) {
         xEventGroupSetBits(time_event_group, TIME_SET_BIT);
     }
+    //memset(color_digit_empty, 0x00, sizeof(struct rgb_color) * 15);
 }
 
 void obtain_time(EventGroupHandle_t wifi_event_group) {
-    xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
+    xEventGroupWaitBits(wifi_event_group, BIT0, false, true, portMAX_DELAY);
     ESP_LOGI(CLOCK_TAG, "Initializing SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "se.pool.ntp.org");
+    sntp_setservername(0, "pool.ntp.org");
     sntp_init();
 }

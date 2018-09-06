@@ -10,10 +10,15 @@
 #include "esp_timer.h"
 #include "soc/frc_timer_reg.h"
 #include "soc/rtc.h"
+#include <math.h>
 
 #define LED_TAG "LED_MATRIX"
 
 #define UPDATED_BIT BIT0
+
+#define READ_TIMER ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)))
+
+#define GET_OFFSET(X, Y, COLOR) ((Y < 16) ? ((Y * 64 * 6) + COLOR + (X * 6) ) : (((Y - 16) * 64 * 6) + COLOR + 3 + (X * 6)) )
 
 SemaphoreHandle_t buffer_semaphore;
 EventGroupHandle_t update_display_handle;
@@ -63,12 +68,12 @@ void update_display() {
 }
 
 void draw_display() {
-    t1 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
+    t1 = READ_TIMER;
     for(uint8_t color_intensity_counter = 1; color_intensity_counter < 9; color_intensity_counter++) {
         volatile uint8_t* temp_ptr = buffer;
-        t2 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
+        t2 = READ_TIMER;
         for(uint8_t i = 0; i < 16; i++) {
-            t3 = ((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1)));
+            t3 = READ_TIMER;
             if(i & 0x01) {
                 GPIO.out_w1ts = (1 << A_pin);
             } else {
@@ -127,11 +132,11 @@ void draw_display() {
             }
             GPIO.out_w1ts = (1 << LAT);
             GPIO.out_w1tc = (1 << LAT);
-            t0 = REG_READ(FRC_TIMER_COUNT_REG(1));
+            t0 = READ_TIMER;
             GPIO.out_w1tc = (1 << OE);
-            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t0) / timer_ticks_per_us) < ((LED_ON_TIME * brightness * 2)));
+            while(((READ_TIMER - t0) / timer_ticks_per_us) < ((LED_ON_TIME * brightness * 2)));
             GPIO.out_w1ts = (1 << OE);
-            while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t3) / timer_ticks_per_us) < (90)); // making sure every line taskes the same amount of time to draw reduces flickering
+            while(((READ_TIMER - t3) / timer_ticks_per_us) < (90)); // making sure every line taskes the same amount of time to draw reduces flickering
         }
         
     }
@@ -148,52 +153,32 @@ void draw_display() {
             ESP_LOGE(LED_TAG, "Failed to swap the buffers");
         }
     }
-    while(((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us) < (10000)); // update the display every 1 ms
-    //printf("%llu\n", ((((uint64_t) REG_READ(FRC_TIMER_COUNT_REG(1))) - t1) / timer_ticks_per_us));
+    while(((READ_TIMER - t1) / timer_ticks_per_us) < (10000)); // update the display every 1 ms
+    //printf("%llu\n", ((READ_TIMER - t1) / timer_ticks_per_us));
 }
 
-void set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
+void set_pixel(uint8_t x, uint8_t y, struct rgb_color color) {
     // error check if the pixel is outside of panel, since it's unsigned integer, most unsigned values will be outside (iffy)
     if(x >= WIDTH || y >= HEIGHT)
         return;
-    printf("setting x:%d, y:%d\t%d %d %d\n", x, y, r, g, b);
-    uint32_t row_offset;
+    //printf("setting x:%d, y:%d\t%d %d %d\n", x, y, r, g, b);
     if(buffer_semaphore != NULL) {
         if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
-            if(y < 16) {
-                row_offset = y * 64 * 6;
-                shared_buffer_ptr[row_offset + R0_OFFSET + x*6] = r;
-                shared_buffer_ptr[row_offset + G0_OFFSET + x*6] = g;
-                shared_buffer_ptr[row_offset + B0_OFFSET + x*6] = b;
-            } else {
-                row_offset = (y-16) * 64 * 6;
-                shared_buffer_ptr[row_offset + R1_OFFSET + x*6] = r;
-                shared_buffer_ptr[row_offset + G1_OFFSET + x*6] = g;
-                shared_buffer_ptr[row_offset + B1_OFFSET + x*6] = b;
-            }
-            
+            shared_buffer_ptr[GET_OFFSET(x, y, RED)] = color.r;
+            shared_buffer_ptr[GET_OFFSET(x, y, GREEN)] = color.g;
+            shared_buffer_ptr[GET_OFFSET(x, y, BLUE)] = color.b;
             xSemaphoreGive(buffer_semaphore);
         }
     }
 }
 
-void set_pixel_in_buffer(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b, uint8_t* buff) {
+void set_pixel_in_buffer(uint8_t x, uint8_t y, struct rgb_color color, uint8_t* buff) {
     // error check if the pixel is outside of panel, since it's unsigned integer, most unsigned values will be outside (iffy)
     if(x >= WIDTH || y >= HEIGHT)
         return;
-    uint16_t row_offset;
-            
-    if(y < 16) {
-        row_offset = y * 64 * 6;
-        buff[row_offset + R0_OFFSET + x*6] = r;
-        buff[row_offset + G0_OFFSET + x*6] = g;
-        buff[row_offset + B0_OFFSET + x*6] = b;
-    } else {
-        row_offset = (y-16) * 64 * 6;
-        buff[row_offset + R1_OFFSET + x*6] = r;
-        buff[row_offset + G1_OFFSET + x*6] = g;
-        buff[row_offset + B1_OFFSET + x*6] = b;
-    }
+    buff[GET_OFFSET(x, y, RED)] = color.r;
+    buff[GET_OFFSET(x, y, GREEN)] = color.g;
+    buff[GET_OFFSET(x, y, BLUE)] = color.b;
 }
 
 void set_display(uint8_t* buff) {
@@ -205,36 +190,19 @@ void set_display(uint8_t* buff) {
     }
 }
 
-void set_multiple_pixels(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b, size_t x_size, size_t y_size) {
-    for(uint8_t i = 0; i < y_size; i++) {
-        for(uint8_t j = 0; j < x_size; j++) {
-            set_pixel(x + j, y + i, r[i*x_size + j], g[i*x_size + j], b[i*x_size + j]);
-        }
-    }
-}
-
-void draw_digit(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b) {
-    uint64_t digit_r[15];
-    uint64_t digit_g[15];
-    uint64_t digit_b[15];
-    for(uint8_t h = 0; h < 15; h++) {
-        digit_r[h] = ((unsigned long long)r[h] << (x));
-        digit_g[h] = ((unsigned long long)g[h] << (x));
-        digit_b[h] = ((unsigned long long)b[h] << (x));
-    }
+void draw_digit(uint8_t x, uint8_t y, struct rgb_color* digit) {
     if(buffer_semaphore != NULL) {
         if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
             for(uint8_t h = 0; h < 15; h++) {
-                shared_buffer_ptr[((y + h) * 2) + R0_OFFSET] |= (digit_r[h] & 0x00000000FFFFFFFF);
-                shared_buffer_ptr[((y + h) * 2) + 1 + R0_OFFSET] |= (digit_r[h] >> 32);
-                shared_buffer_ptr[((y + h) * 2) + G0_OFFSET] |= (digit_g[h] & 0x00000000FFFFFFFF);
-                shared_buffer_ptr[((y + h) * 2) + 1 + G0_OFFSET] |= (digit_g[h] >> 32);
-                shared_buffer_ptr[((y + h) * 2) + B0_OFFSET] |= (digit_b[h] & 0x00000000FFFFFFFF);
-                shared_buffer_ptr[((y + h) * 2) + 1 + B0_OFFSET] |= (digit_b[h] >> 32);
+                for(uint8_t w = 0; w < 8; w++) {
+                    shared_buffer_ptr[GET_OFFSET((x + w), (y + h), RED)] = digit[(h * 8) + w].r;
+                    shared_buffer_ptr[GET_OFFSET((x + w), (y + h), GREEN)] = digit[(h * 8) + w].g;
+                    shared_buffer_ptr[GET_OFFSET((x + w), (y + h), BLUE)] = digit[(h * 8) + w].b;
+                }
             }
             xSemaphoreGive(buffer_semaphore);
         }
-    }    
+    }
 }
 
 void clear_display() {
@@ -255,4 +223,12 @@ void set_brightness(uint8_t brightness_val) {
             xSemaphoreGive(buffer_semaphore);
         }
     }
+}
+
+struct rgb_color get_color(uint8_t r, uint8_t g, uint8_t b) {
+    struct rgb_color color;
+    color.r = (uint8_t) round(((float)r / 32));
+    color.g = (uint8_t) round(((float)g / 32));
+    color.b = (uint8_t) round(((float)b / 32));
+    return color;
 }

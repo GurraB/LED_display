@@ -163,6 +163,7 @@ esp_err_t start_web_server(void)
         status = ESP_FAIL;
     } else {
         status = ESP_OK;
+        ESP_LOGI(WEB_SERVER_TAG, "Web server started");
     }
     return status;
 }

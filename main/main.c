@@ -38,7 +38,7 @@
 
 #define MAX_DISPLAY_UPDATE_FREQ (10 / portTICK_RATE_MS)
 
-static EventGroupHandle_t wifi_event_group;
+EventGroupHandle_t wifi_event_group;
 
 static uint8_t local_buffer[BUFFER_LENGTH]; 
 
@@ -97,11 +97,11 @@ void web_server_task(void* pvParameter) {
 }
 
 void clock_task(void* pvParameter) {
-    unsigned long t;
+    TickType_t last_wake_time = xTaskGetTickCount();
+    init_clock(wifi_event_group);
     while(1) {
-        t = esp_log_timestamp();
         update_clock();
-        vTaskDelay((1000 - (esp_log_timestamp() - t)) / portTICK_RATE_MS);
+        vTaskDelayUntil(&last_wake_time, 1000 / portTICK_RATE_MS);  //wait 1s
     }
     vTaskDelete(NULL);
 }
@@ -118,10 +118,11 @@ void draw_display_task(void* pvParameter) {
 void test_task(void* pvParamter) {
     printf("Test task started\n");
     uint16_t pos = 0;
-    uint8_t led = 0;
+    struct rgb_color color = get_color(108, 62, 209);
     while(1) {
+        
         for(uint8_t i = 0; i < 64; i++) {
-            set_pixel_in_buffer(i, pos, 7, 1, 8, local_buffer);
+            set_pixel_in_buffer(i, pos, color, local_buffer);
         }
         pos++;
         if(pos > 31)
@@ -148,7 +149,6 @@ void init() {
     init_morphing_digits();
     set_brightness(5);
     wifi_event_group = initialise_wifi();
-    init_clock(wifi_event_group);
     xTaskHandle idle_handle = xTaskGetIdleTaskHandleForCPU(1);
     esp_task_wdt_delete(idle_handle); // the second CPU is dedicated to draw the display, therefore we don't want wdt on IDLE task
 }
@@ -157,8 +157,8 @@ void app_main()
 {
     init();
     xTaskCreatePinnedToCore(&web_server_task, "web_server_task", 16384, NULL, 1, NULL, MAINPROCESSOR);
-    //xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 2, NULL, MAINPROCESSOR);
-    xTaskCreatePinnedToCore(&test_task, "test_task", 16384, NULL, 2, NULL, MAINPROCESSOR);
+    xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 2, NULL, MAINPROCESSOR);
+    //xTaskCreatePinnedToCore(&test_task, "test_task", 16384, NULL, 2, NULL, MAINPROCESSOR);
     xTaskCreatePinnedToCore(&draw_display_task, "draw_display_task", 16384, NULL, 1, NULL, ULPPROCESSOR);
 }
 

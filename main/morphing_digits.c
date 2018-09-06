@@ -1,4 +1,5 @@
 #include "morphing_digits.h"
+#include "rgb_matrix.h"
 
 uint8_t zero[] = {0b01111110, 0b10000001, 0b10000001, 0b10000001, 0b10000001,
                   0b10000001, 0b10000001, 0b00000000, 0b10000001, 0b10000001,
@@ -42,6 +43,12 @@ uint8_t nine[] = {0b01111110, 0b10000001, 0b10000001, 0b10000001, 0b10000001,
 
 uint8_t* digits[10];
 
+struct rgb_color black = {
+    .r = 0,
+    .g = 0,
+    .b = 0
+};
+
 void morph(uint8_t from, uint8_t to, uint8_t* animation_type) {
     uint8_t* arr = digits[from];
     uint8_t* target = digits[to];
@@ -69,45 +76,6 @@ void morph(uint8_t from, uint8_t to, uint8_t* animation_type) {
     }
 }
 
-void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, uint8_t* holder) {
-    uint8_t animation_type[15];
-    uint8_t* arr = digits[from];
-    uint8_t* target = digits[to];
-    morph(from, to, animation_type);
-    for(uint8_t i = 0; i < 15; i++) {
-        switch(animation_type[i]) {
-            case NOTHING:
-                *holder = arr[i];
-                break;
-            case REMOVE_RIGHT:
-                *holder = (arr[i] << step) | target[i];
-                break;
-            case REMOVE_LEFT:
-                *holder = (arr[i] >> step) | target[i];
-                break;
-            case REMOVE_LINE:
-                *holder = arr[i] >> step;
-                break;
-            case MOVE_RIGHT_TO_LEFT:
-                *holder = arr[i] << step;
-                break;
-            case MOVE_LEFT_TO_RIGHT:
-                *holder = arr[i] >> step;
-                break;
-            case ADD_RIGHT:
-                *holder = (arr[i] >> step) | arr[i];
-                break;
-            case ADD_LEFT:
-                *holder = (arr[i] << step) | arr[i];
-                break;
-            case ADD_LINE:
-                *holder = 0b01111110 >> (7 - step);
-        }
-        *holder = flip_bits(*holder);
-        holder++;
-    }
-}
-
 uint8_t flip_bits(uint8_t byte_to_flip) {
     uint8_t temp = 0;
     for(uint8_t j = 0; j < 8; j++) {
@@ -116,9 +84,63 @@ uint8_t flip_bits(uint8_t byte_to_flip) {
     return temp;
 }
 
-void get_digit(uint8_t digit, uint8_t* holder) {
+void get_digit(uint8_t digit, struct rgb_color *holder, struct rgb_color color) {
+    uint8_t temp[15];
     for(uint8_t i = 0; i < 15; i++) {
-        *holder++ = flip_bits(digits[digit][i]);
+        temp[i] = flip_bits(digits[digit][i]);
+        for(uint8_t j = 0; j < 8; j++) {
+            if((temp[i] >> j) & 0x01) {
+                *holder++ = color;
+            } else {
+                *holder++ = black;
+            }
+        }
+    }
+}
+
+void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, struct rgb_color *holder, struct rgb_color color) {
+    uint8_t temp[15];
+    uint8_t animation_type[15];
+    uint8_t* arr = digits[from];
+    uint8_t* target = digits[to];
+    morph(from, to, animation_type);
+    for(uint8_t i = 0; i < 15; i++) {
+        switch(animation_type[i]) {
+            case NOTHING:
+                temp[i] = arr[i];
+                break;
+            case REMOVE_RIGHT:
+                temp[i] = (arr[i] << step) | target[i];
+                break;
+            case REMOVE_LEFT:
+                temp[i] = (arr[i] >> step) | target[i];
+                break;
+            case REMOVE_LINE:
+                temp[i] = arr[i] >> step;
+                break;
+            case MOVE_RIGHT_TO_LEFT:
+                temp[i] = arr[i] << step;
+                break;
+            case MOVE_LEFT_TO_RIGHT:
+                temp[i] = arr[i] >> step;
+                break;
+            case ADD_RIGHT:
+                temp[i] = (arr[i] >> step) | arr[i];
+                break;
+            case ADD_LEFT:
+                temp[i] = (arr[i] << step) | arr[i];
+                break;
+            case ADD_LINE:
+                temp[i] = 0b01111110 >> (7 - step);
+        }
+        temp[i] = flip_bits(temp[i]);
+        for(uint8_t j = 0; j < 8; j++) {
+            if((temp[i] >> j) & 0x01) {
+                *holder++ = color;
+            } else {
+                *holder++ = black;
+            }
+        }
     }
 }
 

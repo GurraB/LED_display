@@ -17,12 +17,9 @@
 
 // Each color pin covers half the display
 #define SINGLE_COLOR_BUFFER_LENGTH ((WIDTH * HEIGHT) / 2)
-#define R0_OFFSET 0
-#define G0_OFFSET 1
-#define B0_OFFSET 2
-#define R1_OFFSET 3
-#define G1_OFFSET 4
-#define B1_OFFSET 5
+#define RED 0
+#define GREEN 1
+#define BLUE 2
 
 // The time the pixels are ON in microseconds at 1% brightness
 #define LED_ON_TIME 1
@@ -53,17 +50,21 @@
                             (1ULL<<A_pin) | (1ULL<<B_pin) | (1ULL<<C_pin) | (1ULL<<D_pin) | \
                             (1ULL<<CLK) | (1ULL<<LAT) | (1ULL<<OE))
 
+struct rgb_color {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+};
+
 void init_rgb_matrix(void);
 
 void update_display(void);
 
 void draw_display(void);
 
-void set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b);
+void set_pixel(uint8_t x, uint8_t y, struct rgb_color color);
 
-void set_pixel_in_buffer(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b, uint8_t* buff);
-
-void set_multiple_pixels(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b, size_t x_size, size_t y_size);
+void set_pixel_in_buffer(uint8_t x, uint8_t y, struct rgb_color color, uint8_t* buff);
 
 void set_display(uint8_t* buff);
 
@@ -71,8 +72,8 @@ void clear_display(void);
 
 void set_brightness(uint8_t brightness_val);
 
-void draw_digit(uint8_t x, uint8_t y, uint8_t* r, uint8_t* g, uint8_t* b);
+void draw_digit(uint8_t x, uint8_t y, struct rgb_color* digit);
 
-void test_pins(void);
+struct rgb_color get_color(uint8_t r, uint8_t g, uint8_t b);
 
 #endif

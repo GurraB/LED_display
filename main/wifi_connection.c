@@ -11,7 +11,7 @@
 #define WIFI_TAG "WIFI_CONNECTION"
 #define EVENT_TAG "EVENT_HANDLER"
 
-static EventGroupHandle_t wifi_event_group;
+EventGroupHandle_t wifi_event_group;
 extern const int CONNECTED_BIT;
 
 esp_err_t event_handler(void *ctx, system_event_t *event)
@@ -44,6 +44,7 @@ EventGroupHandle_t initialise_wifi(void)
 {
     tcpip_adapter_init();
     wifi_event_group = xEventGroupCreate();
+    xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
     esp_err_t status;
 
     // creates a task that listens for wifi events

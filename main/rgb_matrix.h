@@ -72,7 +72,7 @@ void clear_display(void);
 
 void set_brightness(uint8_t brightness_val);
 
-void draw_digit(uint8_t x, uint8_t y, struct rgb_color* digit);
+void draw_digit(uint8_t x, uint8_t y, struct rgb_color* digit, uint8_t digit_size);
 
 struct rgb_color get_color(uint8_t r, uint8_t g, uint8_t b);
 

@@ -13,11 +13,14 @@
 #define ADD_LEFT 7
 #define ADD_LINE 8
 
+#define SMALL 7
+#define REGULAR 15
+
 uint8_t flip_bits(uint8_t byte_to_flip);
 
-void get_digit(uint8_t digit, struct rgb_color* holder, struct rgb_color color);
+void get_digit(uint8_t digit, struct rgb_color* holder, struct rgb_color color, uint8_t digit_size);
 
-void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, struct rgb_color *holder, struct rgb_color color);
+void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, struct rgb_color *holder, struct rgb_color color, uint8_t digit_size);
 
 void init_morphing_digits();
 

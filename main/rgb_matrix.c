@@ -11,6 +11,7 @@
 #include "soc/frc_timer_reg.h"
 #include "soc/rtc.h"
 #include <math.h>
+#include "morphing_digits.h"
 
 #define LED_TAG "LED_MATRIX"
 
@@ -33,6 +34,7 @@ uint8_t shared_brightness = 100;
 uint8_t r0_val, b0_val, g0_val, r1_val, g1_val, b1_val;
 uint64_t t0 = 0, t1, t2, t3;
 uint32_t timer_ticks_per_us;
+uint8_t mux;
 
 void init_pins() {
     gpio_config_t io_conf;
@@ -74,27 +76,38 @@ void draw_display() {
         t2 = READ_TIMER;
         for(uint8_t i = 0; i < 16; i++) {
             t3 = READ_TIMER;
-            if(i & 0x01) {
+            if(i == 0) {
+                mux = 15;
+            } else {
+                mux = i - 1;
+            }
+            if(mux & 0x01) {
                 GPIO.out_w1ts = (1 << A_pin);
             } else {
                 GPIO.out_w1tc = (1 << A_pin);
             }
-            if(i & 0x02) {
+            if(mux & 0x02) {
                 GPIO.out_w1ts = (1 << B_pin);
             } else {
                 GPIO.out_w1tc = (1 << B_pin);
             }
-            if(i & 0x04) {
+            if(mux & 0x04) {
                 GPIO.out_w1ts = (1 << C_pin);
             } else {
                 GPIO.out_w1tc = (1 << C_pin);
             }
-            if(i & 0x08) {
+            if(mux & 0x08) {
                 GPIO.out_w1ts = (1 << D_pin);
             } else {
                 GPIO.out_w1tc = (1 << D_pin);
             }
             
+            GPIO.out_w1ts = (1 << LAT);
+            GPIO.out_w1tc = (1 << LAT);
+
+            t0 = READ_TIMER;
+            GPIO.out_w1tc = (1 << OE);
+
             for(uint8_t k = 0; k < 64; k++) {
                 if((*temp_ptr++) >= color_intensity_counter) {
                     GPIO.out_w1ts = (1 << r0_pin);
@@ -130,13 +143,12 @@ void draw_display() {
                 GPIO.out_w1ts = (1 << CLK);
                 GPIO.out_w1tc = (1 << CLK);
             }
-            GPIO.out_w1ts = (1 << LAT);
-            GPIO.out_w1tc = (1 << LAT);
-            t0 = READ_TIMER;
-            GPIO.out_w1tc = (1 << OE);
+            
             while(((READ_TIMER - t0) / timer_ticks_per_us) < ((LED_ON_TIME * brightness * 2)));
+            //while(((READ_TIMER - t0) / timer_ticks_per_us) < (70));
             GPIO.out_w1ts = (1 << OE);
-            while(((READ_TIMER - t3) / timer_ticks_per_us) < (90)); // making sure every line taskes the same amount of time to draw reduces flickering
+            //printf("%llu\n", ((READ_TIMER - t3) / timer_ticks_per_us));
+            //while(((READ_TIMER - t3) / timer_ticks_per_us) < (50)); // making sure every line taskes the same amount of time to draw reduces flickering
         }
         
     }
@@ -153,9 +165,9 @@ void draw_display() {
             ESP_LOGE(LED_TAG, "Failed to swap the buffers");
         }
     }
-    while(((READ_TIMER - t1) / timer_ticks_per_us) < (10000)); // update the display every 1 ms
-    //printf("%llu\n", ((READ_TIMER - t1) / timer_ticks_per_us));
-}
+    printf("%llu\n", ((READ_TIMER - t1) / timer_ticks_per_us));
+    while(((READ_TIMER - t1) / timer_ticks_per_us) < (5000)); // update the display every 1 ms
+} // 5500
 
 void set_pixel(uint8_t x, uint8_t y, struct rgb_color color) {
     // error check if the pixel is outside of panel, since it's unsigned integer, most unsigned values will be outside (iffy)
@@ -190,14 +202,22 @@ void set_display(uint8_t* buff) {
     }
 }
 
-void draw_digit(uint8_t x, uint8_t y, struct rgb_color* digit) {
+void draw_digit(uint8_t x, uint8_t y, struct rgb_color* digit, uint8_t digit_size) {
     if(buffer_semaphore != NULL) {
         if((xSemaphoreTake(buffer_semaphore, (TickType_t) 10) == pdTRUE)) {
-            for(uint8_t h = 0; h < 15; h++) {
-                for(uint8_t w = 0; w < 8; w++) {
-                    shared_buffer_ptr[GET_OFFSET((x + w), (y + h), RED)] = digit[(h * 8) + w].r;
-                    shared_buffer_ptr[GET_OFFSET((x + w), (y + h), GREEN)] = digit[(h * 8) + w].g;
-                    shared_buffer_ptr[GET_OFFSET((x + w), (y + h), BLUE)] = digit[(h * 8) + w].b;
+            for(uint8_t h = 0; h < digit_size; h++) {
+                if(digit_size == SMALL) {
+                    for(uint8_t w = 0; w < 4; w++) {
+                        shared_buffer_ptr[GET_OFFSET((x + w), (y + h), RED)] = (digit[(h * 8) + w].r);
+                        shared_buffer_ptr[GET_OFFSET((x + w), (y + h), GREEN)] = (digit[(h * 8) + w].g);
+                        shared_buffer_ptr[GET_OFFSET((x + w), (y + h), BLUE)] = (digit[(h * 8) + w].b);
+                    }
+                } else if(digit_size == REGULAR) {
+                    for(uint8_t w = 0; w < 8; w++) {
+                        shared_buffer_ptr[GET_OFFSET((x + w), (y + h), RED)] = digit[(h * 8) + w].r;
+                        shared_buffer_ptr[GET_OFFSET((x + w), (y + h), GREEN)] = digit[(h * 8) + w].g;
+                        shared_buffer_ptr[GET_OFFSET((x + w), (y + h), BLUE)] = digit[(h * 8) + w].b;
+                    }
                 }
             }
             xSemaphoreGive(buffer_semaphore);

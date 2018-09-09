@@ -22,16 +22,12 @@
 static EventGroupHandle_t time_event_group;
 
 uint8_t s0, s0_old = 0, s1, s1_old = 0, m0, m0_old = 0, m1, m1_old = 0, h0, h0_old = 0, h1, h1_old = 0, day0, day1, month0, month1;
-uint8_t digit[15] = {0};
-struct rgb_color color_digit[15 * 8];
-struct rgb_color color_digit_empty[15];
-uint8_t digit_empty[15] = {0};
 
 time_t now;
 struct tm timeinfo;
 
-uint8_t update_clock() {
-    struct rgb_color color = get_color(0, 0, 255);
+uint8_t update_clock(struct rgb_color color, uint8_t x, uint8_t y, uint8_t digit_size) {
+    struct rgb_color color_digit[digit_size * 8];
     get_time();
     
     if(!(xEventGroupGetBits(time_event_group) & TIME_SET_BIT)) {
@@ -50,48 +46,70 @@ uint8_t update_clock() {
     month0 = timeinfo.tm_mon % 10;
     month1 = timeinfo.tm_mon / 10;
 
-    for(uint8_t i = 0; i < 8; i++) {
+    uint8_t xpos = x;
+    uint8_t offset_per_digit = 0;
+    uint8_t animation_length = 5;
+    uint8_t dots_offset = 0;
+    if(digit_size == SMALL) {
+        offset_per_digit = 5;
+        animation_length = 5;
+        dots_offset = 2;
+    } else if(digit_size == REGULAR) {
+        offset_per_digit = 9;
+        animation_length = 9;
+        dots_offset = 6;
+    }
+
+    for(uint8_t i = 1; i < animation_length; i++) {
+        xpos = x;
         if(h1 == h1_old) {
-            get_digit(h1, color_digit, color);
-            draw_digit(0, 0, color_digit);
+            get_digit(h1, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(h1_old, h1, i, color_digit, color);
-            draw_digit(0, 0, color_digit);
+            get_single_animation_step(h1_old, h1, i, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         }
+        xpos += offset_per_digit;
         if(h0 == h0_old) {
-            get_digit(h0, color_digit, color);
-            draw_digit(9, 0, color_digit);
+            get_digit(h0, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(h0_old, h0, i, color_digit, color);
-            draw_digit(9, 0, color_digit);
+            get_single_animation_step(h0_old, h0, i, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         }
-        set_pixel(18, 6, color);
-        set_pixel(18 ,8, color);
+        xpos += offset_per_digit;
+        set_pixel(xpos, y + dots_offset, color);
+        set_pixel(xpos , y + dots_offset + 2, color);
+        xpos += 2;
         if(m1 == m1_old) {
-            get_digit(m1, color_digit, color);
-            draw_digit(20, 0, color_digit);
+            get_digit(m1, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(m1_old, m1, i, color_digit, color);
-            draw_digit(20, 0, color_digit);
+            get_single_animation_step(m1_old, m1, i, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         }
+        xpos += offset_per_digit;
         if(m0 == m0_old) {
-            get_digit(m0, color_digit, color);
-            draw_digit(29, 0, color_digit);
+            get_digit(m0, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(m0_old, m0, i, color_digit, color);
-            draw_digit(29, 0, color_digit);
+            get_single_animation_step(m0_old, m0, i, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         }
-        set_pixel(38, 6, color);
-        set_pixel(38 ,8, color);
+        xpos += offset_per_digit;
+        set_pixel(xpos, y + dots_offset, color);
+        set_pixel(xpos ,y + dots_offset + 2, color);
+        xpos += 2;
         if(s1 == s1_old) {
-            get_digit(s1, color_digit, color);
-            draw_digit(40, 0, color_digit);
+            get_digit(s1, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(s1_old, s1, i, color_digit, color);
-            draw_digit(40, 0, color_digit);
+            get_single_animation_step(s1_old, s1, i, color_digit, color, digit_size);
+            draw_digit(xpos, y, color_digit, digit_size);
         }
-        get_single_animation_step(s0_old, s0, i, color_digit, color);
-        draw_digit(49, 0, color_digit);
+        xpos += offset_per_digit;
+        get_single_animation_step(s0_old, s0, i, color_digit, color, digit_size);
+        draw_digit(xpos, y, color_digit, digit_size);
         
         /*get_digit(day1, digit);
         draw_digit(0, 16, digit_empty, digit, digit_empty);

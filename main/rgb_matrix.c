@@ -145,10 +145,7 @@ void draw_display() {
             }
             
             while(((READ_TIMER - t0) / timer_ticks_per_us) < ((LED_ON_TIME * brightness * 2)));
-            //while(((READ_TIMER - t0) / timer_ticks_per_us) < (70));
             GPIO.out_w1ts = (1 << OE);
-            //printf("%llu\n", ((READ_TIMER - t3) / timer_ticks_per_us));
-            //while(((READ_TIMER - t3) / timer_ticks_per_us) < (50)); // making sure every line taskes the same amount of time to draw reduces flickering
         }
         
     }
@@ -159,15 +156,14 @@ void draw_display() {
             shared_buffer_ptr = temp;
             brightness = shared_brightness;
             xSemaphoreGive(buffer_semaphore);
-            //clear_display();
             xEventGroupClearBits(update_display_handle, NEW_DATA_BIT);
         } else {
             ESP_LOGE(LED_TAG, "Failed to swap the buffers");
         }
     }
-    printf("%llu\n", ((READ_TIMER - t1) / timer_ticks_per_us));
-    while(((READ_TIMER - t1) / timer_ticks_per_us) < (5000)); // update the display every 1 ms
-} // 5500
+    //printf("%llu\n", ((READ_TIMER - t1) / timer_ticks_per_us));
+    while(((READ_TIMER - t1) / timer_ticks_per_us) < (5000)); // update the display every 5 ms
+}
 
 void set_pixel(uint8_t x, uint8_t y, struct rgb_color color) {
     // error check if the pixel is outside of panel, since it's unsigned integer, most unsigned values will be outside (iffy)

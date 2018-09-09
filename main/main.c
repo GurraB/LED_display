@@ -30,6 +30,7 @@
 #include "wifi_connection.h"
 #include "morphing_digits.h"
 #include "clock.h"
+#include "weather.h"
 
 #define TAG "LED_DISPLAY"
 #define OTA_TAG "OTA"
@@ -100,10 +101,21 @@ void web_server_task(void* pvParameter) {
 
 void clock_task(void* pvParameter) {
     TickType_t last_wake_time = xTaskGetTickCount();
-    struct rgb_color color = get_color(0, 0, 32);
+    struct rgb_color time_color = get_color(0, 0, 32);
+    struct rgb_color date_color = get_color(32, 32, 0);
+    struct rgb_color temperature_color = get_color(0, 32, 0);
     while(1) {
-        update_clock(color, 5, 10, SMALL);
+        update_clock(time_color, date_color, temperature_color, 0, 0, REGULAR);
         vTaskDelayUntil(&last_wake_time, 1000 / portTICK_RATE_MS);  //wait 1s
+    }
+    vTaskDelete(NULL);
+}
+
+void weather_task(void* pvParameter) {
+    TickType_t last_wake_time = xTaskGetTickCount();
+    while(1) {
+        update_weather_information(wifi_event_group);
+        vTaskDelayUntil(&last_wake_time, (1000 * 60 * 15) / portTICK_RATE_MS); // update every 15 min
     }
     vTaskDelete(NULL);
 }
@@ -161,6 +173,7 @@ void app_main()
     init();
     xTaskCreatePinnedToCore(&web_server_task, "web_server_task", 16384, NULL, 1, NULL, MAINPROCESSOR);
     xTaskCreatePinnedToCore(&clock_task, "clock_task", 8192, NULL, 2, &clock_task_handle, MAINPROCESSOR);
+    xTaskCreatePinnedToCore(&weather_task, "weather_task", 8192, NULL, 2, &clock_task_handle, MAINPROCESSOR);
     //xTaskCreatePinnedToCore(&test_task, "test_task", 16384, NULL, 2, NULL, MAINPROCESSOR);
     xTaskCreatePinnedToCore(&draw_display_task, "draw_display_task", 16384, NULL, 1, NULL, ULPPROCESSOR);
 }

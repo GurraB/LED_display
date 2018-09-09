@@ -224,7 +224,9 @@ void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, struct rg
                 break;
         }
         temp[i] = flip_bits(temp[i]);
-        temp[i] = temp[i] >> 4;
+        if(digit_size == SMALL) {
+            temp[i] = temp[i] >> 4;
+        }
         for(uint8_t j = 0; j < 8; j++) {
             if((temp[i] >> j) & 0x01) {
                 *holder++ = color;
@@ -233,6 +235,8 @@ void get_single_animation_step(uint8_t from, uint8_t to, uint8_t step, struct rg
             }
         }
     }
+    free(temp);
+    free(animation_type);
 }
 
 void init_morphing_digits() {

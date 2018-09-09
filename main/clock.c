@@ -3,6 +3,7 @@
 #include <time.h>
 #include "esp_log.h"
 #include <string.h>
+#include <math.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -12,6 +13,7 @@
 
 #include "rgb_matrix.h"
 #include "morphing_digits.h"
+#include "weather.h"
 
 #define CLOCK_TAG "CLOCK_TAG"
 //#ifndef CONNECTED_BIT
@@ -26,14 +28,14 @@ uint8_t s0, s0_old = 0, s1, s1_old = 0, m0, m0_old = 0, m1, m1_old = 0, h0, h0_o
 time_t now;
 struct tm timeinfo;
 
-uint8_t update_clock(struct rgb_color color, uint8_t x, uint8_t y, uint8_t digit_size) {
-    struct rgb_color color_digit[digit_size * 8];
-    get_time();
-    
+uint8_t update_clock(struct rgb_color time_color, struct rgb_color date_color, struct rgb_color temperature_color, uint8_t x, uint8_t y, uint8_t digit_size) {
     if(!(xEventGroupGetBits(time_event_group) & TIME_SET_BIT)) {
         // TODO: draw a loading icon instead
         return 0;
     }
+    struct rgb_color color_digit[digit_size * 8];
+    get_time();
+    
     s0 = timeinfo.tm_sec % 10;
     s1 = timeinfo.tm_sec / 10;
     m0 = timeinfo.tm_min % 10;
@@ -63,79 +65,57 @@ uint8_t update_clock(struct rgb_color color, uint8_t x, uint8_t y, uint8_t digit
     for(uint8_t i = 1; i < animation_length; i++) {
         xpos = x;
         if(h1 == h1_old) {
-            get_digit(h1, color_digit, color, digit_size);
+            get_digit(h1, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(h1_old, h1, i, color_digit, color, digit_size);
+            get_single_animation_step(h1_old, h1, i, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         }
         xpos += offset_per_digit;
         if(h0 == h0_old) {
-            get_digit(h0, color_digit, color, digit_size);
+            get_digit(h0, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(h0_old, h0, i, color_digit, color, digit_size);
+            get_single_animation_step(h0_old, h0, i, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         }
         xpos += offset_per_digit;
-        set_pixel(xpos, y + dots_offset, color);
-        set_pixel(xpos , y + dots_offset + 2, color);
+        set_pixel(xpos, y + dots_offset, time_color);
+        set_pixel(xpos , y + dots_offset + 2, time_color);
         xpos += 2;
         if(m1 == m1_old) {
-            get_digit(m1, color_digit, color, digit_size);
+            get_digit(m1, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(m1_old, m1, i, color_digit, color, digit_size);
+            get_single_animation_step(m1_old, m1, i, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         }
         xpos += offset_per_digit;
         if(m0 == m0_old) {
-            get_digit(m0, color_digit, color, digit_size);
+            get_digit(m0, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(m0_old, m0, i, color_digit, color, digit_size);
+            get_single_animation_step(m0_old, m0, i, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         }
         xpos += offset_per_digit;
-        set_pixel(xpos, y + dots_offset, color);
-        set_pixel(xpos ,y + dots_offset + 2, color);
+        set_pixel(xpos, y + dots_offset, time_color);
+        set_pixel(xpos ,y + dots_offset + 2, time_color);
         xpos += 2;
         if(s1 == s1_old) {
-            get_digit(s1, color_digit, color, digit_size);
+            get_digit(s1, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         } else {
-            get_single_animation_step(s1_old, s1, i, color_digit, color, digit_size);
+            get_single_animation_step(s1_old, s1, i, color_digit, time_color, digit_size);
             draw_digit(xpos, y, color_digit, digit_size);
         }
         xpos += offset_per_digit;
-        get_single_animation_step(s0_old, s0, i, color_digit, color, digit_size);
+        get_single_animation_step(s0_old, s0, i, color_digit, time_color, digit_size);
         draw_digit(xpos, y, color_digit, digit_size);
-        
-        /*get_digit(day1, digit);
-        draw_digit(0, 16, digit_empty, digit, digit_empty);
-        get_digit(day0, digit);
-        draw_digit(9, 16, digit_empty, digit, digit_empty);
-        
-        set_pixel(18, 30, 0, 1, 0);
-        set_pixel(18, 29, 0, 1, 0);
-        set_pixel(18, 28, 0, 1, 0);
-        set_pixel(19, 27, 0, 1, 0);
-        set_pixel(19, 26, 0, 1, 0);
-        set_pixel(19, 25, 0, 1, 0);
-        set_pixel(20, 24, 0, 1, 0);
-        set_pixel(20, 23, 0, 1, 0);
-        set_pixel(20, 22, 0, 1, 0);
-        set_pixel(21, 21, 0, 1, 0);
-        set_pixel(21, 20, 0, 1, 0);
-        set_pixel(21, 19, 0, 1, 0);
-        set_pixel(22, 18, 0, 1, 0);
-        set_pixel(22, 17, 0, 1, 0);
-        set_pixel(22, 16, 0, 1, 0);
 
-        get_digit(month1, digit);
-        draw_digit(24, 16, digit_empty, digit, digit_empty);
-        get_digit(month0, digit);
-        draw_digit(33, 16, digit_empty, digit, digit_empty);*/
+        xpos = x;
+        xpos += draw_date(date_color, x, y + digit_size + 2, SMALL);
+        draw_temperature(temperature_color, xpos, y + digit_size + 2, REGULAR);
 
         update_display();
         vTaskDelay(20 / portTICK_RATE_MS);
@@ -148,6 +128,148 @@ uint8_t update_clock(struct rgb_color color, uint8_t x, uint8_t y, uint8_t digit
     h0_old = h0;
     h1_old = h1;
     return 1;
+}
+
+uint8_t draw_date(struct rgb_color color, uint8_t x, uint8_t y, uint8_t digit_size) {
+    if(!(xEventGroupGetBits(time_event_group) & TIME_SET_BIT)) {
+        // TODO: draw a loading icon instead
+        return 0;
+    }
+    struct rgb_color color_digit[digit_size * 8];
+    get_time();
+
+    day0 = timeinfo.tm_mday % 10;
+    day1 = timeinfo.tm_mday / 10;
+    month0 = timeinfo.tm_mon % 10;
+    month1 = timeinfo.tm_mon / 10;
+
+    uint8_t xpos = x;
+    uint8_t offset_per_digit = 0;
+    if(digit_size == SMALL) {
+        offset_per_digit = 5;
+    } else if(digit_size == REGULAR) {
+        offset_per_digit = 9;
+    }
+
+    get_digit(day1, color_digit, color, digit_size);
+    draw_digit(xpos, y, color_digit, digit_size);
+    xpos += offset_per_digit;
+    get_digit(day0, color_digit, color, digit_size);
+    draw_digit(xpos, y, color_digit, digit_size);
+    xpos += offset_per_digit;
+
+    if(digit_size == SMALL) {
+        set_pixel(xpos + 2, y, color);
+        set_pixel(xpos + 2, y + 1, color);
+        set_pixel(xpos + 1, y + 2, color);
+        set_pixel(xpos + 1, y + 3, color);
+        set_pixel(xpos + 1, y + 4, color);
+        set_pixel(xpos, y + 5, color);
+        set_pixel(xpos, y + 6, color);
+        xpos += 4;
+    } else if(digit_size == REGULAR) {
+        set_pixel(xpos + 4, y, color);
+        set_pixel(xpos + 4, y + 1, color);
+        set_pixel(xpos + 4, y + 2, color);
+        set_pixel(xpos + 3, y + 3, color);
+        set_pixel(xpos + 3, y + 4, color);
+        set_pixel(xpos + 3, y + 5, color);
+        set_pixel(xpos + 2, y + 6, color);
+        set_pixel(xpos + 2, y + 7, color);
+        set_pixel(xpos + 2, y + 8, color);
+        set_pixel(xpos + 1, y + 9, color);
+        set_pixel(xpos + 1, y + 10, color);
+        set_pixel(xpos + 1, y + 11, color);
+        set_pixel(xpos, y + 12, color);
+        set_pixel(xpos, y + 13, color);
+        set_pixel(xpos, y + 14, color);
+        xpos += 6;
+    }
+
+    get_digit(month1, color_digit, color, digit_size);
+    draw_digit(xpos, y, color_digit, digit_size);
+    xpos += offset_per_digit;
+    get_digit(month0, color_digit, color, digit_size);
+    draw_digit(xpos, y, color_digit, digit_size);
+    xpos += offset_per_digit;
+
+    return xpos - x;
+}
+
+uint8_t draw_temperature(struct rgb_color color, uint8_t x, uint8_t y, uint8_t digit_size) {
+    struct rgb_color color_digit[digit_size * 8];
+    uint8_t offset_per_digit = 0;
+    uint8_t dot_offset = 0;
+    uint8_t negative_offset = 0;
+    uint8_t xpos = x;
+    uint8_t degree_offset = 0;
+    uint8_t digit;
+    if(digit_size == SMALL) {
+        offset_per_digit = 5;
+        dot_offset = 6;
+        negative_offset = 3;
+        degree_offset = 0;
+    } else if(digit_size == REGULAR) {
+        offset_per_digit = 9;
+        dot_offset = 14;
+        negative_offset = 7;
+        degree_offset = 6;
+    }
+    float temperature = get_temperature();
+    if(temperature < 0) {
+        set_pixel(xpos, y + negative_offset, color);
+        set_pixel(xpos + 1, y + negative_offset, color);
+        if(digit_size == REGULAR) {
+            set_pixel(xpos + 2, y + negative_offset, color);
+            xpos++;
+        }
+        xpos += 3;
+    }
+    if(temperature >= 10 || temperature <= -10) {
+        digit = (uint8_t) abs(floor(temperature / 10));
+        get_digit(digit, color_digit, color, digit_size);
+        draw_digit(xpos, y, color_digit, digit_size);
+        xpos += offset_per_digit;
+    }
+    digit = (uint8_t) abs(((uint8_t) floor(temperature) % 10));
+    get_digit(digit, color_digit, color, digit_size);
+    draw_digit(xpos, y, color_digit, digit_size);
+    xpos += offset_per_digit;
+
+    set_pixel(xpos, y + dot_offset, color);
+    xpos += 2;
+
+    digit = abs(((uint8_t) round(temperature * 10))) % 10;
+    get_digit(digit, color_digit, color, digit_size);
+    draw_digit(xpos, y, color_digit, digit_size);
+    xpos += offset_per_digit;
+
+    if(digit_size == SMALL) {
+
+    } else if(digit_size == REGULAR) {
+        set_pixel(xpos, y + degree_offset + 1, color);
+        set_pixel(xpos, y + degree_offset + 2, color);
+        set_pixel(xpos + 1, y + degree_offset, color);
+        set_pixel(xpos + 2, y + degree_offset, color);
+        set_pixel(xpos + 1, y + degree_offset + 3, color);
+        set_pixel(xpos + 2, y + degree_offset + 3, color);
+        set_pixel(xpos + 3, y + degree_offset + 1, color);
+        set_pixel(xpos + 3, y + degree_offset + 2, color);
+        xpos += 4;
+        
+        set_pixel(xpos + 1, y + degree_offset + 4, color);
+        set_pixel(xpos + 2, y + degree_offset + 4, color);
+        set_pixel(xpos + 3, y + degree_offset + 4, color);
+        set_pixel(xpos, y + degree_offset + 5, color);
+        set_pixel(xpos, y + degree_offset + 6, color);
+        set_pixel(xpos, y + degree_offset + 7, color);
+        set_pixel(xpos + 1, y + degree_offset + 8, color);
+        set_pixel(xpos + 2, y + degree_offset + 8, color);
+        set_pixel(xpos + 3, y + degree_offset + 8, color);
+        xpos += 5;
+    }
+
+    return xpos;
 }
 
 void get_time() {
@@ -172,7 +294,6 @@ void init_clock(EventGroupHandle_t wifi_event_group) {
     if(retry < retry_count) {
         xEventGroupSetBits(time_event_group, TIME_SET_BIT);
     }
-    //memset(color_digit_empty, 0x00, sizeof(struct rgb_color) * 15);
 }
 
 void obtain_time(EventGroupHandle_t wifi_event_group) {

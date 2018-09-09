@@ -6,6 +6,7 @@
 #include "esp_http_client.h"
 #include "weather.h"
 #include "freertos/event_groups.h"
+#include "api_keys.h"
 
 #define WEATHER_TAG "WEATHER"
 
@@ -50,7 +51,7 @@ float get_temperature() {
 void update_weather_information(EventGroupHandle_t wifi_event_group) {
     xEventGroupWaitBits(wifi_event_group, BIT0, false, true, portMAX_DELAY);
     char url[200];
-    sprintf(url, API_CALL, MALMOE_ID, API_KEY);
+    sprintf(url, API_CALL, MALMOE_ID, WEATHER_API_KEY);
     esp_http_client_config_t config = {
         .url = url,
         .event_handler = http_event_handle,

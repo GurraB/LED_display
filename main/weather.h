@@ -6,7 +6,6 @@
 
 #define API_CALL "http://api.openweathermap.org/data/2.5/weather?id=%s&units=metric&APPID=%s"
 #define MALMOE_ID "2692969"
-#define API_KEY "3f8d5be2a26b01e8d8b83c5758e4b13d"
 
 float get_temperature();
 

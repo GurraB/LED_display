@@ -101,7 +101,7 @@ void web_server_task(void* pvParameter) {
 
 void clock_task(void* pvParameter) {
     TickType_t last_wake_time = xTaskGetTickCount();
-    struct rgb_color time_color = get_color(0, 0, 32);
+    struct rgb_color time_color = get_color(0, 0, 64);
     struct rgb_color date_color = get_color(32, 32, 0);
     struct rgb_color temperature_color = get_color(0, 32, 0);
     while(1) {

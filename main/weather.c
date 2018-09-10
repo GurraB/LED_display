@@ -7,10 +7,11 @@
 #include "weather.h"
 #include "freertos/event_groups.h"
 #include "api_keys.h"
+#include "cJSON.h"
 
 #define WEATHER_TAG "WEATHER"
 
-float temperature = 99;
+double temperature = 99;
 
 esp_err_t http_event_handle(esp_http_client_event_t *evt)
 {
@@ -44,7 +45,7 @@ esp_err_t http_event_handle(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-float get_temperature() {
+double get_temperature() {
     return temperature;
 }
 
@@ -73,22 +74,15 @@ void update_weather_information(EventGroupHandle_t wifi_event_group) {
 }
 
 void extract_temperature(char* get_response) {
-    char str_temperature[5];
-    char* temp_pointer = strstr(get_response, "\"temp\":");
-    if(temp_pointer != NULL) {
-        temp_pointer += 7;
-        uint8_t counter = 0;
-        while(counter < 5) {
-            if(*temp_pointer == ',') {
-                break;
+    cJSON* response_json = cJSON_Parse(get_response);
+    if (response_json != NULL) {
+        cJSON* main_json = cJSON_GetObjectItemCaseSensitive(response_json, "main");
+        if (main_json != NULL) {
+            cJSON* temp = cJSON_GetObjectItemCaseSensitive(main_json, "temp");
+            if(cJSON_IsNumber(temp)) {
+                temperature = temp->valuedouble;
             }
-            str_temperature[counter] = *temp_pointer++;
-            counter++;
         }
-        temperature = strtof(str_temperature, NULL);
-
-    } else {
-        ESP_LOGE(WEATHER_TAG, "Could not find \"temp\": in response");
-        printf("Response is:\n %s\n\n", get_response);
     }
+    cJSON_Delete(response_json);
 }

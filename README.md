@@ -7,6 +7,6 @@ An IoT LED display using a 64x32 RGB LED matrix and an ESP32
 It looks even better in real life!
 
 ## Clock
-![Image of the clock](https://imgur.com/a/h2l9Xwf)
+<img src="https://i.imgur.com/SmXuj1X.jpg" width="500">
 
 The clock displays time with animations seen in the gif. The date and the temperature is also shown.
